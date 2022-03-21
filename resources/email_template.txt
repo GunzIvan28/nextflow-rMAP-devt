@@ -1,0 +1,38 @@
+========================================
+ nextflow-rMAP workflow: version ${version}
+========================================
+Run Name: $runName
+
+<% if (success){
+    out << "## nextflow-rMAP worklfow execution completed successfully! ##"
+} else {
+    out << """####################################################
+## nextflow-rMAP execution completed unsuccessfully! ##
+####################################################
+The exit status of the task that caused the workflow execution to fail was: $exitStatus.
+The full error message was:
+
+${errorReport}
+"""
+} %>
+
+
+The workflow was completed at $dateComplete (duration: $duration)
+
+The command used to launch the workflow was as follows:
+
+  $commandLine
+
+
+
+Pipeline Configuration:
+-----------------------
+<% out << summary.collect{ k,v -> " - $k: $v" }.join("\n") %>
+
+
+--
+nextflow-rMAP is a Nextflow bioinformatics pipeline that takes its predecessor rMAP through a series of reproducible steps through a 
+high level workflow engine. All the steps performed in the rMAP pipeline including: sequence quality control, trimming, De novo assembly, 
+genome annotation, SNP variant calling, phylogenetic inference using maximum likelihood methods, resistome profiling, pangenome analysis, 
+insertion sequence determination and html report visualization are automated in this pipeline built especially for HPC and cloud compute 
+clusters. Please reference the authors of rMAP if using this pipeline. 
