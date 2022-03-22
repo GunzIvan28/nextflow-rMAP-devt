@@ -1,3 +1,5 @@
+//#! $HOME/miniconda3/envs/rMAP-1.0/bin/nextflow
+
 /*
 ========================================================================================
                R M A P   P I P E L I N E
@@ -35,7 +37,7 @@ params.email = false
 params.plaintext_email = false
 params.input = "./sequences/*.gz"
 read_data = Channel.fromPath(params.input)
-params.clean_reads = "${params.outdir}/trimmed_reads/*_{1,2}.clean.fastq.gz"
+params.clean_reads = './results/trimmed_reads/*_{1,2}.clean.fastq.gz'
 read_data = Channel.fromPath(params.input)
 params.outdir = "./results"
 params.reads = "./sequences/*_{1,2}.fastq.gz"
@@ -175,12 +177,32 @@ process denovoAssembly {
 
   output:
 
-file("*") into assembly_ch
+  file("*") into assembly_ch
 
   """
     mkdir -p ${pairId}
     shovill --R1 ${in_fastq.get(0)} --R2 ${in_fastq.get(1)} --cpus ${params.max_cpus} --gsize 3.4M --ram 8 --force --outdir ${pairId}
     mv ${pairId}/contigs.fa ${pairId}/${pairId}.fa
-    
+
   """
 }
+
+// // Aseembly with megahit
+// process denovoAssembly {
+//   publishDir "${params.outdir}/assembly/", mode: "copy", overwrite: false
+//   cpus 8
+//   memory '8 GB'
+
+//   input:
+//   set pairId, file(in_fastq) from clean_reads_ch
+
+//   output:
+
+//   file("*") into assembly_ch
+
+//   """
+//     megahit -1 ${in_fastq.get(0)} -2 ${in_fastq.get(1)} -o ${pairId}/files -t ${params.max_cpus}
+//     mv ${pairId}/files/final.contigs.fa ${pairId}/files/${pairId}.fa
+
+//   """
+// }
