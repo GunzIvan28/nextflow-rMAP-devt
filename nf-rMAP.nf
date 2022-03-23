@@ -16,25 +16,25 @@ def helpMessage() {
     ============================================================
     Usage:
     The typical command for running the pipeline is as follows:
-    nextflow run main --reads '*R{1,2}.fastq' --reference "" --output ""
+    nextflow run main nf-rMAP.nf <args>
     
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes)
-      -profile                      Hardware config to use. (local.config)
+      --profile                     Hardware config to use. (local.config)
       --reference                   Path to reference genome to be used
-      --output                      Path to output data (must be surrounded with quotes)   
+      --output                      Path to output data (must be surrounded with quotes)  
+
     """.stripIndent()
 }
 
-/*
-* SET UP CONFIGURATION VARIABLES
- */
+// Show help emssage
+params.help = false
+if (params.help){
+    helpMessage();
+    exit 0
+}
 
 // Configurable variables
-params.name = false
-params.project = false
-params.email = false
-params.plaintext_email = false
 params.input = "./sequences/*.gz"
 read_data = Channel.fromPath(params.input)
 params.clean_reads = './results/trimmed_reads/*_{1,2}.clean.fastq.gz'
@@ -42,18 +42,12 @@ read_data = Channel.fromPath(params.input)
 params.outdir = "./results"
 params.reads = "./sequences/*_{1,2}.fastq.gz"
 params.adapter = "/${HOME}/miniconda3/envs/rMAP-1.0/config-files/adapters.fa"
+params.contigs = "./results/assembly/*.fa"
 params.max_cpus = 12
 params.quality = 27
 params.minlength = 80
 params.version = 1.0
 
-
-// Show help emssage
-params.help = false
-if (params.help){
-    helpMessage()
-    exit 0
-}
 
 // Has the run name been specified by the user?
 //  this has the bonus effect of catching both -name and --name
@@ -83,9 +77,7 @@ summary['Current user']   = "$USER"
 summary['Current path']   = "$PWD"
 summary['Script dir']     = workflow.projectDir
 summary['Config Profile'] = workflow.profile
-if(params.email) {
-    summary['E-mail Address'] = params.email
-}
+
 log.info summary.collect { k,v -> "${k.padRight(15)}: $v" }.join("\n")
 log.info "============================================================"
 
@@ -153,8 +145,6 @@ process adapterTrimming {
   set sampleid, file(in_fastq) from trimming_input_ch
 
   output:
-//   set val(sampleid), file("${sampleid}.*") into processed_reads_ch
-
  file"${sampleid}_1.clean.fastq.gz" into processed_reads1_ch
  file"${sampleid}_2.clean.fastq.gz" into processed_reads2_ch
 
@@ -166,7 +156,7 @@ process adapterTrimming {
 Channel
     .fromFilePairs( params.clean_reads )
     .set { clean_reads_ch }
-
+// De novo assembly using shovill
 process denovoAssembly {
   publishDir "${params.outdir}/assembly/", mode: "copy", overwrite: false
   cpus 8
@@ -177,32 +167,33 @@ process denovoAssembly {
 
   output:
 
-  file("*") into assembly_ch
+file("*") into assembly_ch
 
   """
     mkdir -p ${pairId}
     shovill --R1 ${in_fastq.get(0)} --R2 ${in_fastq.get(1)} --cpus ${params.max_cpus} --gsize 3.4M --ram 8 --force --outdir ${pairId}
     mv ${pairId}/contigs.fa ${pairId}/${pairId}.fa
-
+    cp ${pairId}/${pairId}.fa .
   """
+
 }
 
-// // Aseembly with megahit
-// process denovoAssembly {
-//   publishDir "${params.outdir}/assembly/", mode: "copy", overwrite: false
-//   cpus 8
-//   memory '8 GB'
+datasets = Channel
+                  .fromPath(params.contigs)
 
-//   input:
-//   set pairId, file(in_fastq) from clean_reads_ch
+// Works but requires 'annotation.sampleid.fa' workup
+process genomeAnnotation {
+  publishDir "${params.outdir}/annotation/${contig_fasta}", mode: "copy", overwrite: false
+  
+  input:
+  file contig_fasta from datasets
 
-//   output:
+  output:
+  file("*") into annotated_ch
 
-//   file("*") into assembly_ch
-
-//   """
-//     megahit -1 ${in_fastq.get(0)} -2 ${in_fastq.get(1)} -o ${pairId}/files -t ${params.max_cpus}
-//     mv ${pairId}/files/final.contigs.fa ${pairId}/files/${pairId}.fa
-
-//   """
-// }
+  script:
+  """
+  prokka --outdir . --prefix ${contig_fasta} --cpus 12 ${contig_fasta} --locustag ${contig_fasta} --force
+  
+  """
+}
