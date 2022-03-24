@@ -178,22 +178,23 @@ file("*") into assembly_ch
 
 }
 
-datasets = Channel
-                  .fromPath(params.contigs)
+// Super clean annotation of genomes using prokka
+Channel.fromPath("./results/assembly/*.fa")
+        .set { assemblies_ch }
 
-// Works but requires 'annotation.sampleid.fa' workup
-process genomeAnnotation {
-  publishDir "${params.outdir}/annotation/${contig_fasta}", mode: "copy", overwrite: false
-  
-  input:
-  file contig_fasta from datasets
+process genomeAnnotations {
+        tag { "${assembly.baseName}" }
+        publishDir "${params.outdir}/annotation/${assembly.baseName}", mode: "copy", overwrite: false
+        input:
+              	file(assembly) from assemblies_ch
+        output:
+               	file("*") into annotated_ch
 
-  output:
-  file("*") into annotated_ch
 
-  script:
-  """
-  prokka --outdir . --prefix ${contig_fasta} --cpus 12 ${contig_fasta} --locustag ${contig_fasta} --force
-  
-  """
+"""
+prokka --outdir . --prefix ${assembly} --cpus 12 ${assembly} --locustag ${assembly} --force
+
+"""
+
 }
+
